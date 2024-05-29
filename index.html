@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio to Text Converter</title>
+</head>
+<body>
+    <input type="file" id="audio-file" accept="audio/*">
+    <button id="convert-button">Convert to Text</button>
+    <p id="transcript"></p>
+
+    <script>
+        document.getElementById('convert-button').addEventListener('click', () => {
+            const fileInput = document.getElementById('audio-file');
+            const file = fileInput.files[0];
+            if (file) {
+                const formData = new FormData();
+                formData.append('audio', file);
+
+                fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.blob())
+                .then(blob => {
+                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    const reader = new FileReader();
+                    reader.readAsArrayBuffer(blob);
+                    reader.onload = () => {
+                        audioContext.decodeAudioData(reader.result, (buffer) => {
+                            const source = audioContext.createBufferSource();
+                            source.buffer = buffer;
+                            source.connect(audioContext.destination);
+                            source.start(0);
+
+                            const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+                            recognition.lang = 'es-ES';
+                            recognition.interimResults = false;
+                            recognition.maxAlternatives = 1;
+
+                            recognition.onresult = (event) => {
+                                const transcript = event.results[0][0].transcript;
+                                document.getElementById('transcript').textContent = transcript;
+                            };
+
+                            recognition.onerror = (event) => {
+                                console.error('Speech recognition error:', event.error);
+                            };
+
+                            recognition.onend = () => {
+                                console.log('Speech recognition service disconnected');
+                            };
+
+                            recognition.start();
+                        });
+                    };
+                })
+                .catch(error => {
+                    console.error('Error uploading or processing the audio file:', error);
+                });
+            } else {
+                alert('Please select an audio file first.');
+            }
+        });
+    </script>
+</body>
+</html>
